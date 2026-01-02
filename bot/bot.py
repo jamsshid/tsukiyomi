@@ -37,6 +37,14 @@ CHANNEL_IDS = [int(x) for x in raw_channels.split(",") if x.strip()]
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
+DELETE_AFTER = 10 
+
+def yuborilmadi_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Yuborilmadi ❌", callback_data="send")]
+    ])
+
+
 class AdminState(StatesGroup):
     choosing_cat_action = State() 
     adding_new_cat = State()  
@@ -169,11 +177,39 @@ async def finalize_order(callback: types.CallbackQuery, state: FSMContext):
             f"📍 [Lokatsiyani ko'rish]({loc_url})"
         )
 
-        await bot.send_message(
-            channel_id, order_text, parse_mode="Markdown", disable_web_page_preview=False
-        )
+        sent_msg = await bot.send_message(
+    channel_id,
+    order_text,
+    reply_markup=yuborilmadi_keyboard(),  # bu yerda tugma qo‘shildi
+    parse_mode="Markdown",
+    disable_web_page_preview=False
+)
+
     await callback.message.edit_text("✅ Rahmat! Buyurtmangiz qabul qilindi.")
     await state.clear()
+
+
+@dp.callback_query(F.data == "send")
+async def send_handler(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+
+    # Faqat admin tugmani bosishi mumkin
+    if user_id not in ADMIN_IDS:
+        await callback.answer("⛔ Siz admin emassiz!", show_alert=True)
+        return
+
+    # Tugma Yuborildi ✅ ga o'zgaradi
+    await callback.message.edit_reply_markup(
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Yuborildi ✅", callback_data="done")]
+        ])
+    )
+    await callback.answer("Yuborildi ✅")
+
+    # Belgilangan vaqtdan keyin xabar o'chadi
+    await asyncio.sleep(DELETE_AFTER)
+    await callback.message.delete()
+
 
 from asgiref.sync import sync_to_async
 from django.core.files.base import ContentFile
